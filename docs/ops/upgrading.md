@@ -1,5 +1,5 @@
 ---
-title: "Upgrading Applications and Flink Versions"
+title: "升级应用程序和Flink版本"
 nav-parent_id: setup
 nav-pos: 15
 ---
@@ -25,14 +25,17 @@ under the License.
 * ToC
 {:toc}
 
-Flink DataStream programs are typically designed to run for long periods of time such as weeks, months, or even years. As with all long-running services, Flink streaming applications need to be maintained, which includes fixing bugs, implementing improvements, or migrating an application to a Flink cluster of a later version.
 
-This document describes how to update a Flink streaming application and how to migrate a running streaming application to a different Flink cluster.
+Flink DataStream程序通常设计为长时间运行，如数周，数月甚至数年。与所有长期运行的服务一样，Flink流应用程序需要维护，包括修复漏洞，实施改进，或将应用程序迁移到更高版本的Flink群集。 
 
-## Restarting Streaming Applications
+本文档介绍了如何更新Flink流应用程序以及如何将正在运行的流应用程序迁移到不同的Flink群集。 
 
-The line of action for upgrading a streaming application or migrating an application to a different cluster is based on Flink's [Savepoint]({{ site.baseurl }}/setup/savepoints.html) feature. A savepoint is a consistent snapshot of the state of an application at a specific point in time. 
+## 重新启动流应用程序
 
+升级流应用程序或将应用程序迁移到不同群集的行动方案是基于Flink保存点[Savepoint]({{ site.baseurl }}/setup/savepoints.html)的功能。
+保存点（Savepoint）是特定时间点上应用程序状态的一致快照。 
+
+从运行的流应用程序获取保存点（Savepoint）有两种方式。
 There are two ways of taking a savepoint from a running streaming application.
 
 * Taking a savepoint and continue processing.
