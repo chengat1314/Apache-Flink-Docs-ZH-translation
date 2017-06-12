@@ -35,37 +35,36 @@ Flink DataStream程序通常设计为长时间运行，如数周，数月甚至�
 升级流应用程序或将应用程序迁移到不同群集的行动方案是基于Flink保存点[Savepoint]({{ site.baseurl }}/setup/savepoints.html)的功能。
 保存点（Savepoint）是特定时间点上应用程序状态的一致快照。 
 
-从运行的流应用程序获取保存点（Savepoint）有两种方式。
-There are two ways of taking a savepoint from a running streaming application.
+从运行的流应用程序获取保存点（Savepoint）有两种方式。 
 
-* Taking a savepoint and continue processing.
+
+* 生成一个保存点(savepoint)并继续处理.
 ```
 > ./bin/flink savepoint <jobID> [pathToSavepoint]
 ```
-It is recommended to periodically take savepoints in order to be able to restart an application from a previous point in time.
+建议定期生成保存点(savepoint)，以便能够从以前的时间点重新启动应用程序
 
-* Taking a savepoint and stopping the application as a single action. 
+* 生成保存点(savepoint)并将应用程序作为单个操作停止。
 ```
 > ./bin/flink cancel -s [pathToSavepoint] <jobID>
 ```
-This means that the application is canceled immediately after the savepoint completed, i.e., no other checkpoints are taken after the savepoint.
-
-Given a savepoint taken from an application, the same or a compatible application (see [Application State Compatibility](#application-state-compatibility) section below) can be started from that savepoint. Starting an application from a savepoint means that the state of its operators is initialized with the operator state persisted in the savepoint. This is done by starting an application using a savepoint.
+这意味着应用程序在生成保存点(savepoint)完成后立即被取消，即在这个保存点之后再没有其他检查点（checkpoints）。 
+给定从应用程序取得的保存点，相同或兼容的应用程序(查阅 [应用程序状态兼容性](#application-state-compatibility) 下面章节)
+可以从该保存点开始。从保存点启动应用程序意味着其 operator 的状态被初始化，operator状态保存在保存点中。这是通过使用保存点启动应用程序来完成的。 
 ```
 > ./bin/flink run -d -s [pathToSavepoint] ~/application.jar
 ```
+当启动应用程序的 operator 在保存点被采用时，对原始应用程序 operator的状态（即应用程序保存点被取自）进行初始化。已启动的应用程序从保存点这一点开始继续处理。
 
-The operators of the started application are initialized with the operator state of the original application (i.e., the application the savepoint was taken from) at the time when the savepoint was taken. The started application continues processing from exactly this point on. 
+**注意**: 即使Flink不断保存应用程序的状态，它也不能将写入还原到外部系统。如果在不停止应用程序的时候，不断生成保存点，这可能是一个问题。在这种情况下，应用程序可能在保存点生成后继续发出数据。重新启动的应用程序可能（取决于是否更改应用程序逻辑）再次发出相同的数据。对不不同的“SinkFunction”和存储系统，此行为的确切效果可能会有很大的不同。发出两次的数据可能会对像Cassandra这样的键值存储（key-value）进行幂等的写入，但是在附加到日志系统（如Kafka）的情况下会有问题。在任何情况下，应该仔细检查并测试重新启动的应用程序的行为。 
 
-**Note**: Even though Flink consistently restores the state of an application, it cannot revert writes to external systems. This can be an issue if you resume from a savepoint that was taken without stopping the application. In this case, the application has probably emitted data after the savepoint was taken. The restarted application might (depending on whether you changed the application logic or not) emit the same data again. The exact effect of this behavior can be very different depending on the `SinkFunction` and storage system. Data that is emitted twice might be OK in case of idempotent writes to a key-value store like Cassandra but problematic in case of appends to a durable log such as Kafka. In any case, you should carefully check and test the behavior of a restarted application.
+## 应用程序状态兼容性
 
-## Application State Compatibility
+当升级应用程序以修复漏洞或改进应用程序时，通常的目标是在保持其状态的同时更换正在运行的应用程序的应用程序逻辑。我们通过从原始应用程序获取的保存点启动升级的应用程序来实现此目的。但是，只有当两个应用程序都是*状态兼容*时才能操作，这意味着升级后的应用程序的 operator 能够以原始应用程序的 operator 的状态初始化其状态。 
 
-When upgrading an application in order to fix a bug or to improve the application, usually the goal is to replace the application logic of the running application while preserving its state. We do this by starting the upgraded application from a savepoint which was taken from the original application. However, this does only work if both applications are *state compatible*, meaning that the operators of upgraded application are able to initialize their state with the state of the operators of original application. 
+在本节中，我们将讨论如何修改应用程序以保持状态兼容。
 
-In this section, we discuss how applications can be modified to remain state compatible.
-
-### Matching Operator State
+### 匹配 Operator 状态
 
 When an application is restarted from a savepoint, Flink matches the operator state stored in the savepoint to stateful operators of the started application. The matching is done based on operator IDs, which are also stored in the savepoint. Each operator has a default ID that is derived from the operator's position in the application's operator topology. Hence, an unmodified application can always be restarted from one of its own savepoints. However, the default IDs of operators are likely to change if an application is modified. Therefore, modified applications can only be started from a savepoint if the operator IDs have been explicitly specified. Assigning IDs to operators is very simple and done using the `uid(String)` method as follows:
 
